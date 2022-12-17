@@ -37,4 +37,13 @@ pub mod multisig_transaction {
     pub fn withdraw(ctx: Context<Withdraw>, withdrawal_amount: u64) -> Result<()> {
         instructions::withdraw(ctx, withdrawal_amount)
     }
+
+    /// Reseting Global State
+    pub fn reset_global_state(
+        ctx: Context<Reset>,
+        admins: Vec<Pubkey>,
+        threshold: u64,
+    ) -> Result<()> {
+        instructions::reset_global_state(ctx, admins, threshold)
+    }
 }
