@@ -1,5 +1,6 @@
 use super::*;
 
 mod global;
+mod proposal;
 
-pub use global::*;
+pub use {global::*, proposal::*};

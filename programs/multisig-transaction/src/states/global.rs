@@ -3,12 +3,20 @@ use super::*;
 #[account]
 pub struct GlobalState {
     pub admins: PublicKeys,
-    pub threshold: u64,
+    pub threshold: usize,
+    pub favourable_votes: usize,
+    pub is_voted: bool,
 }
 
 impl GlobalState {
-    pub fn save(&mut self, owners: PublicKeys, threshold: u64) {
-        self.admins = owners;
+    pub fn store(&mut self, admins: PublicKeys, threshold: usize) {
+        self.admins = admins;
         self.threshold = threshold;
+        self.reset();
+    }
+
+    pub fn reset(&mut self) {
+        self.favourable_votes = 0;
+        self.is_voted = false;
     }
 }

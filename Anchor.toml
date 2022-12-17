@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-multisig_transaction = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+multisig_transaction = "B5Df1ZgqTsUZPjezozfoYm1snbFtiP2uVJCspyWuNeGG"
 
 [registry]
 url = "https://api.apr.dev"

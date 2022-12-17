@@ -1,6 +1,8 @@
 use super::*;
 
+mod council;
 mod deposit;
 mod initialize;
+mod withdraw;
 
-pub use {deposit::*, initialize::*};
+pub use {council::*, deposit::*, initialize::*, withdraw::*};
