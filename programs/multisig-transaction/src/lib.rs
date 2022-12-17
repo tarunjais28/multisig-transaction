@@ -1,4 +1,4 @@
-use crate::{constants::*, errors::*, instructions::*, states::*, types::*};
+use crate::{constants::*, errors::*, instructions::*, states::*};
 use anchor_lang::{
     prelude::*,
     solana_program::{
@@ -11,7 +11,6 @@ mod constants;
 mod errors;
 mod instructions;
 mod states;
-mod types;
 
 declare_id!("B5Df1ZgqTsUZPjezozfoYm1snbFtiP2uVJCspyWuNeGG");
 
@@ -20,11 +19,7 @@ pub mod multisig_transaction {
     use super::*;
 
     /// Initialization
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        admins: PublicKeys,
-        threshold: usize,
-    ) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, admins: Vec<Pubkey>, threshold: u64) -> Result<()> {
         instructions::initialize(ctx, admins, threshold)
     }
 
@@ -33,7 +28,7 @@ pub mod multisig_transaction {
         instructions::deposit(ctx, deposit_amount)
     }
 
-    /// Deposit Sols
+    /// Council for casting vote for the transaction
     pub fn council(ctx: Context<CastVote>, votings: Proposals) -> Result<()> {
         instructions::cast_vote(ctx, votings)
     }

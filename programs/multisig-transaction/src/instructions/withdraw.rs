@@ -45,7 +45,7 @@ pub fn withdraw(ctx: Context<Withdraw>, withdrawal_amount: u64) -> Result<()> {
 }
 
 fn bump(seeds: &[&[u8]], program_id: &Pubkey) -> u8 {
-    let (_found_key, bump) = Pubkey::find_program_address(seeds, program_id);
+    let (_, bump) = Pubkey::find_program_address(seeds, program_id);
     bump
 }
 

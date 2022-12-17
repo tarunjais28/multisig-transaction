@@ -27,8 +27,8 @@ pub fn cast_vote(ctx: Context<CastVote>, votings: Proposals) -> Result<()> {
     global_state.favourable_votes = votings
         .proposals
         .iter()
-        .filter(|&proposal| proposal.can_withdraw == true)
-        .count();
+        .filter(|&proposal| proposal.can_withdraw)
+        .count() as u64;
 
     global_state.is_voted = true;
 
