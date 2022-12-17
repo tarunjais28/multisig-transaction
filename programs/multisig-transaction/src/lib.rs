@@ -1,9 +1,10 @@
-use crate::{instructions::*, states::*, types::*};
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program;
-use anchor_lang::solana_program::instruction::Instruction;
+use crate::{constants::*, instructions::*, states::*, types::*};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{program::invoke, system_instruction},
+};
 use std::convert::Into;
-
+mod constants;
 mod instructions;
 mod states;
 mod types;
@@ -17,5 +18,10 @@ pub mod multisig_transaction {
     /// Initialization
     pub fn initialize(ctx: Context<Initialize>, admins: PublicKeys, threshold: u64) -> Result<()> {
         instructions::initialize(ctx, admins, threshold)
+    }
+
+    /// Deposit Sols
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        instructions::deposit(ctx, amount)
     }
 }

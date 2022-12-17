@@ -1,5 +1,6 @@
 use super::*;
 
+mod deposit;
 mod initialize;
 
-pub use initialize::*;
+pub use {deposit::*, initialize::*};
