@@ -18,10 +18,13 @@ describe("multisig-transaction", () => {
   const admin2 = anchor.web3.Keypair.generate();
   const admin3 = anchor.web3.Keypair.generate();
   const wallet = anchor.web3.Keypair.generate();
+  const unknownWallet = anchor.web3.Keypair.generate();
 
   // Constant Fields
   const THRESHOLD = new BN(2);
   const DEPOSIT_AMOUNT = new BN(anchor.web3.LAMPORTS_PER_SOL);
+  const HALF_DEPOSIT_AMOUNT = new BN(anchor.web3.LAMPORTS_PER_SOL / 2);
+  const EXCESS_AMOUNT = new BN(3 * anchor.web3.LAMPORTS_PER_SOL);
 
   // Declare PDAs
   let pdaGlobalAccount,
@@ -61,7 +64,7 @@ describe("multisig-transaction", () => {
     await confirmTransaction(init);
   };
 
-  const deposit = async () => {
+  const deposit = async (amount) => {
     [pdaEscrow] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("escrow"), wallet.publicKey.toBuffer()],
       program.programId
@@ -69,7 +72,7 @@ describe("multisig-transaction", () => {
 
     // Creating deposit instruction
     let deposit = await program.methods
-      .deposit(DEPOSIT_AMOUNT)
+      .deposit(amount)
       .accounts({
         escrowAccount: pdaEscrow,
         wallet: wallet.publicKey,
@@ -102,7 +105,7 @@ describe("multisig-transaction", () => {
     await confirmTransaction(vote);
   };
 
-  const withdraw = async (amount) => {
+  const withdraw = async (amount, wallet) => {
     [pdaGlobalAccount] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("global")],
       program.programId
@@ -122,6 +125,29 @@ describe("multisig-transaction", () => {
       .rpc();
 
     await confirmTransaction(withdraw);
+  };
+
+  const reset = async () => {
+    [pdaGlobalAccount] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("global")],
+      program.programId
+    );
+
+    // Creating reset instruction
+    let reset = await program.methods
+      .resetGlobalState(
+        [admin1.publicKey, admin2.publicKey, admin3.publicKey],
+        THRESHOLD
+      )
+      .accounts({
+        globalState: pdaGlobalAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([])
+      .rpc();
+
+    await confirmTransaction(reset);
   };
 
   it("Initialize test accounts", async () => {
@@ -149,6 +175,12 @@ describe("multisig-transaction", () => {
       2 * anchor.web3.LAMPORTS_PER_SOL
     );
     await confirmTransaction(walletSol);
+
+    let unknownWalletSol = await provider.connection.requestAirdrop(
+      unknownWallet.publicKey,
+      anchor.web3.LAMPORTS_PER_SOL
+    );
+    await confirmTransaction(unknownWalletSol);
   });
 
   it("Initialize global state", async () => {
@@ -173,7 +205,7 @@ describe("multisig-transaction", () => {
       program.programId
     );
 
-    await deposit();
+    await deposit(DEPOSIT_AMOUNT);
 
     // Checking Escrow Balance, must be equal to deposited amount
     let escrowBalance = await provider.connection.getBalance(pdaEscrow);
@@ -190,7 +222,7 @@ describe("multisig-transaction", () => {
           { admin: admin2.publicKey, canWithdraw: true },
         ],
       };
-  
+
       await castVote(proposals);
     } catch (e) {
       let errorCode = e.error.errorCode.code;
@@ -223,7 +255,7 @@ describe("multisig-transaction", () => {
   });
 
   it("Voting for Second Time", async () => {
-    // This call will throw `VoteAlreadyCasted` errors as votes are already 
+    // This call will throw `VoteAlreadyCasted` errors as votes are already
     // casted by council members
     try {
       let proposals = {
@@ -233,7 +265,7 @@ describe("multisig-transaction", () => {
           { admin: admin3.publicKey, canWithdraw: false },
         ],
       };
-  
+
       await castVote(proposals);
     } catch (e) {
       let errorCode = e.error.errorCode.code;
@@ -242,18 +274,13 @@ describe("multisig-transaction", () => {
   });
 
   it("Testing Withdraw", async () => {
-    [pdaGlobalAccount] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("global")],
-      program.programId
-    );
-
     [pdaEscrow] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("escrow"), wallet.publicKey.toBuffer()],
       program.programId
     );
 
     // Creating withdraw instruction and withdraw the deposited amount
-    await withdraw(DEPOSIT_AMOUNT);
+    await withdraw(DEPOSIT_AMOUNT, wallet);
 
     // Checking Escrow Balance, must be 0
     let escrowBalance = await provider.connection.getBalance(pdaEscrow);
@@ -268,7 +295,142 @@ describe("multisig-transaction", () => {
   it("Withdrawing After Full Withdrawal", async () => {
     // This call will throw `InsufficientFunds` errors as escrow account is empty now
     try {
-      await withdraw(DEPOSIT_AMOUNT)
+      await withdraw(DEPOSIT_AMOUNT, wallet);
+    } catch (e) {
+      let errorCode = e.error.errorCode.code;
+      assert.equal(errorCode, "InsufficientFunds");
+    }
+  });
+
+  it("Reset global state", async () => {
+    [pdaGlobalAccount] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("global")],
+      program.programId
+    );
+
+    await reset();
+
+    let globalAccount = await program.account.globalState.fetch(
+      pdaGlobalAccount
+    );
+    assert.equal(Number(globalAccount.threshold), Number(THRESHOLD));
+    assert.equal(Number(globalAccount.favourableVotes), 0);
+    assert.equal(globalAccount.isVoted, false);
+  });
+
+  it("Withdrawing with less favoured transaction", async () => {
+    // Depositing
+    await deposit(DEPOSIT_AMOUNT);
+
+    // This call will throw `ThresholdNotMet` errors as most council members are
+    // against the transaction.
+    try {
+      let proposals = {
+        proposals: [
+          { admin: admin1.publicKey, canWithdraw: false },
+          { admin: admin2.publicKey, canWithdraw: false },
+          { admin: admin3.publicKey, canWithdraw: true },
+        ],
+      };
+
+      await castVote(proposals);
+    } catch (e) {
+      let errorCode = e.error.errorCode.code;
+      assert.equal(errorCode, "ThresholdNotMet");
+    }
+  });
+
+  it("Voting by some of the non-council members", async () => {
+    // Reseting
+    await reset();
+
+    // This call will throw `NotAllVoters` errors as some council members are
+    // not participated.
+    try {
+      let proposals = {
+        proposals: [
+          { admin: admin1.publicKey, canWithdraw: true },
+          { admin: admin2.publicKey, canWithdraw: true },
+          { admin: unknownWallet.publicKey, canWithdraw: true },
+        ],
+      };
+
+      await castVote(proposals);
+    } catch (e) {
+      let errorCode = e.error.errorCode.code;
+      assert.equal(errorCode, "NotAllVoters");
+    }
+  });
+
+  it("Voting by both of the non-council members and council members", async () => {
+    // This call will throw `OutsiderVote` errors as both council and
+    // non-council members are participated.
+    try {
+      let proposals = {
+        proposals: [
+          { admin: admin1.publicKey, canWithdraw: true },
+          { admin: admin2.publicKey, canWithdraw: true },
+          { admin: admin3.publicKey, canWithdraw: true },
+          { admin: unknownWallet.publicKey, canWithdraw: true },
+        ],
+      };
+
+      await castVote(proposals);
+    } catch (e) {
+      let errorCode = e.error.errorCode.code;
+      assert.equal(errorCode, "OutsiderVote");
+    }
+  });
+
+  it("Withdrawing by unknown wallet", async () => {
+    // Creating proposal
+    let proposals = {
+      proposals: [
+        { admin: admin1.publicKey, canWithdraw: false },
+        { admin: admin2.publicKey, canWithdraw: true },
+        { admin: admin3.publicKey, canWithdraw: true },
+      ],
+    };
+
+    await castVote(proposals);
+
+    // Withdraw by unknown wallet
+    try {
+      await withdraw(DEPOSIT_AMOUNT, unknownWallet);
+    } catch (e) {
+      let errorMessage = e.error.errorMessage;
+      assert.equal(errorMessage, "A seeds constraint was violated");
+    }
+  });
+
+  it("Partial Withdraw", async () => {
+    [pdaEscrow] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("escrow"), wallet.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // Creating withdraw instruction and withdraw half deposited amount
+    await withdraw(HALF_DEPOSIT_AMOUNT, wallet);
+
+    // Checking Escrow Balance, must be halfed
+    let escrowBalance = await provider.connection.getBalance(pdaEscrow);
+    assert.equal(escrowBalance, Number(HALF_DEPOSIT_AMOUNT));
+
+    // Creating withdraw instruction and withdraw other half deposited amount
+    await withdraw(HALF_DEPOSIT_AMOUNT, wallet);
+
+    // Checking Escrow Balance, must be 0
+    escrowBalance = await provider.connection.getBalance(pdaEscrow);
+    assert.equal(escrowBalance, 0);
+  });
+  it("Deposit by excess amount", async () => {
+    // Reseting
+    await reset();
+
+    // This call will throw `InsufficientFunds` as wallet don't  balance is
+    // lesser than deposited amount.
+    try {
+      await deposit(EXCESS_AMOUNT);
     } catch (e) {
       let errorCode = e.error.errorCode.code;
       assert.equal(errorCode, "InsufficientFunds");

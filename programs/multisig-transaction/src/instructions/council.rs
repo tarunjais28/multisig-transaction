@@ -5,6 +5,7 @@ use super::*;
 /// This function can throw following errors:
 ///   - Vote Already Casted (when council members have already casted the vote).
 ///   - Not All Voters (when all council members did not casted the vote).
+///   - Outsider Vote (when someone outside the counsil also vote)
 pub fn cast_vote(ctx: Context<CastVote>, votings: Proposals) -> Result<()> {
     let global_state = &mut ctx.accounts.global_state;
 
@@ -20,8 +21,14 @@ pub fn cast_vote(ctx: Context<CastVote>, votings: Proposals) -> Result<()> {
         .count();
 
     require!(
-        matching == global_state.admins.len() && matching == votings.proposals.len(),
+        matching == global_state.admins.len(),
         CustomError::NotAllVoters
+    );
+
+    // Ensuring only council members voted
+    require!(
+        matching == votings.proposals.len(),
+        CustomError::OutsiderVote
     );
 
     global_state.favourable_votes = votings

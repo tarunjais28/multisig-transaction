@@ -13,4 +13,7 @@ pub enum CustomError {
 
     #[msg("Balance is not enough.")]
     InsufficientFunds,
+
+    #[msg("Someone outside the council voted.")]
+    OutsiderVote,
 }
