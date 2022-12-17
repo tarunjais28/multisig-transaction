@@ -1,4 +1,12 @@
+use crate::{instructions::*, states::*, types::*};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program;
+use anchor_lang::solana_program::instruction::Instruction;
+use std::convert::Into;
+
+mod instructions;
+mod states;
+mod types;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -6,10 +14,8 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub mod multisig_transaction {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        Ok(())
+    /// Initialization
+    pub fn initialize(ctx: Context<Initialize>, admins: PublicKeys, threshold: u64) -> Result<()> {
+        instructions::initialize(ctx, admins, threshold)
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
